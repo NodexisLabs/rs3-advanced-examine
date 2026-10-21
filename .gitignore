@@ -1,0 +1,5 @@
+# local wiki mirror database and its journal: large, rebuilt from the wiki
+rswiki-mirror/mirror.db
+rswiki-mirror/mirror.db-journal
+__pycache__/
+*.pyc
