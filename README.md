@@ -51,7 +51,8 @@ kept small too:
 | `plugins/examine-data/data/` | generated data (CC BY-NC-SA 3.0, see its LICENSE) |
 | `build_data.py` | builds `plugins/examine-data/data/` from the mirror; `build/report.md` lists every dropped row and why |
 | `rswiki-mirror/` | the local wiki mirror and its request ledger |
-| `test_*.py` | tests: data lookups in Lua 5.4, the window against a stand-in UI, the mirror against a fake wiki |
+| `spec/` | specs for both plugins, run offline with the [RS3 Plugin Test Kit](https://github.com/NodexisLabs/rs3-plugin-testkit) |
+| `rswiki-mirror/test_mirror.py` | the mirror against a fake wiki |
 
 ## Try it on the plugin beta world
 
@@ -78,8 +79,9 @@ Then in Lua: `ExamineData.dropsOfItem(ExamineData.itemByObj(536))`, and the rest
 python rswiki-mirror/grab.py                 # first fill of the mirror
 python rswiki-mirror/rswiki_mirror.py update  # later: only pages that changed
 python build_data.py              # mirror -> plugins/examine-data/data, no wiki requests
-python test_lookup.py             # needs: pip install lupa
-python test_window.py
+pip install -e <path to rs3-plugin-testkit>   # once
+rs3test run plugins/examine-data spec/examine-data
+rs3test run plugins/advanced-examine spec/advanced-examine
 ```
 
 The mirror database itself is not in this repo.
