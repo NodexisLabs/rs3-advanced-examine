@@ -29,7 +29,7 @@ beta world; not yet submitted to the Plugin Hub.**
 
 ## No network, by design
 
-The plugin makes **zero network requests** and needs no permissions. All data ships inside it as Lua
+The plugins make **zero network requests** and need no permissions. All data ships inside Examine Data as Lua
 tables, built ahead of time from the wiki's structured [Bucket](https://meta.weirdgloop.org/w/Extension:Bucket)
 tables (drops, recipes, shops, game ids). Players never touch the wiki, however many install it.
 
@@ -46,24 +46,38 @@ kept small too:
 
 | Path | What |
 |---|---|
-| `plugin/` | the plugin: `main.lua` (menu hook), `window.lua` (UI), `views.lua` (what to show), `lookup.lua` (data access) |
-| `plugin/data/` | generated data (CC BY-NC-SA 3.0, see its LICENSE) |
-| `build_data.py` | builds `plugin/data/` from the mirror; `build/report.md` lists every dropped row and why |
+| `plugins/advanced-examine/` | the plugin: `main.lua` (menu hook), `window.lua` (UI), `views.lua` (what to show) |
+| `plugins/examine-data/` | **Examine Data**, a library plugin: the wiki data and its lookup API (`lookup.lua`), no UI. Other plugins can depend on it |
+| `plugins/examine-data/data/` | generated data (CC BY-NC-SA 3.0, see its LICENSE) |
+| `build_data.py` | builds `plugins/examine-data/data/` from the mirror; `build/report.md` lists every dropped row and why |
 | `rswiki-mirror/` | the local wiki mirror and its request ledger |
 | `test_*.py` | tests: data lookups in Lua 5.4, the window against a stand-in UI, the mirror against a fake wiki |
 
 ## Try it on the plugin beta world
 
 1. Join the beta world once ([Jagex's tutorial](https://developer.runescape.com/rs/tutorial/1helloworld.html)).
-2. Copy `plugin/` to `C:\ProgramData\Jagex\RuneScape-BETA\dev_plugins\advanced-examine`.
-3. In game, open the console (Alt + \`) and run `prf`, then `pon advanced-examine`.
+2. Copy `plugins/examine-data/` and `plugins/advanced-examine/` into
+   `C:\ProgramData\Jagex\RuneScape-BETA\dev_plugins\`, keeping the folder names.
+3. In game, open the console (Alt + \`) and run `prf`, `pon examine-data`, then `pon advanced-examine`.
+
+## Using the data in your own plugin
+
+Examine Data has no UI. It exists so other plugins can use the same data without bundling another
+copy. In your `plugin.json`:
+
+```json
+"dependencies": { "ExamineData": "examine-data" }
+```
+
+Then in Lua: `ExamineData.dropsOfItem(ExamineData.itemByObj(536))`, and the rest of the API in
+[`lookup.lua`](plugins/examine-data/lookup.lua). The data stays under CC BY-NC-SA 3.0.
 
 ## Rebuilding the data
 
 ```
 python rswiki-mirror/grab.py                 # first fill of the mirror
 python rswiki-mirror/rswiki_mirror.py update  # later: only pages that changed
-python build_data.py              # mirror -> plugin/data, no wiki requests
+python build_data.py              # mirror -> plugins/examine-data/data, no wiki requests
 python test_lookup.py             # needs: pip install lupa
 python test_window.py
 ```
@@ -73,7 +87,7 @@ The mirror database itself is not in this repo.
 ## Credits and licences
 
 - Data: [RuneScape Wiki](https://runescape.wiki), run by [Weird Gloop](https://weirdgloop.org), used under
-  [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). Generated data in `plugin/data/`
+  [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). Generated data in `plugins/examine-data/data/`
   carries the same licence.
 - Code: MIT, see `LICENSE`.
 - Developed with AI assistance (Claude Code). The code is kept small, commented and readable for

@@ -12,7 +12,7 @@
 -- supplies game ids.
 -- Keeping this separate from the window lets it be tested outside the game.
 
-local Lookup = require("lookup")
+local Lookup = require("data")   -- the Examine Data library
 
 local Views = {}
 

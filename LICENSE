@@ -21,5 +21,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 This licence covers the code in this repository. The generated data in
-plugin/data/ is derived from the RuneScape Wiki and is licensed separately
-under CC BY-NC-SA 3.0; see plugin/data/LICENSE.md.
+plugins/examine-data/data/ is derived from the RuneScape Wiki and is licensed separately
+under CC BY-NC-SA 3.0; see plugins/examine-data/data/LICENSE.md.

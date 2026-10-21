@@ -10,7 +10,7 @@
 -- Components are created once and reused; showing a view only changes text,
 -- colours and visibility, and resizing only moves them (layout()).
 
-local Lookup = require("lookup")
+local Lookup = require("data")   -- the Examine Data library
 local Views = require("views")
 
 local Window = {}

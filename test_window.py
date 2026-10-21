@@ -12,7 +12,8 @@ from pathlib import Path
 
 import lupa.lua54 as lupa
 
-PLUGIN = Path(__file__).resolve().parent / "plugin"
+PLUGIN = Path(__file__).resolve().parent / "plugins" / "advanced-examine"
+DATA_PLUGIN = Path(__file__).resolve().parent / "plugins" / "examine-data"
 
 STUBS = r"""
 -- Stand-in UI: components are tables that remember properties and hooks.
@@ -103,7 +104,10 @@ function componentCount() return #all end
 """
 
 lua = lupa.LuaRuntime(unpack_returned_tuples=True)
-lua.execute(f'package.path = "{PLUGIN.as_posix()}/?.lua"')
+# Each plugin has its own root in the client; here both are on the path, and the
+# Examine Data dependency is exposed as the global ExamineData, as the client does.
+lua.execute(f'package.path = "{DATA_PLUGIN.as_posix()}/?.lua;{PLUGIN.as_posix()}/?.lua"')
+lua.execute(f'ExamineData = dofile("{DATA_PLUGIN.as_posix()}/main.lua")')
 lua.execute(STUBS)
 lua.execute(f'dofile("{PLUGIN.as_posix()}/main.lua")')
 g = lua.globals()

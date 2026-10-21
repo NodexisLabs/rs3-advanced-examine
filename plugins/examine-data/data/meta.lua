@@ -2,7 +2,7 @@
 -- Wiki content is licensed CC BY-NC-SA 3.0; this file is a derivative under the same licence.
 -- Do not edit by hand: rebuild instead.
 return {
-built="2026-10-21T03:02:34+00:00",
+built="2026-10-21T04:05:32+00:00",
 source="RuneScape Wiki (runescape.wiki)",
 licence="CC BY-NC-SA 3.0",
 wikiFetched={dropsline="2026-10-20T23:11:57+00:00",item_id="2026-10-20T23:12:04+00:00",npc_id="2026-10-20T23:12:07+00:00",object_id="2026-10-20T23:12:12+00:00",recipe="2026-10-20T23:12:16+00:00",storeline="2026-10-20T23:12:18+00:00",synced_to="2026-10-20T23:11:57Z"},

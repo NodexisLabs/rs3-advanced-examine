@@ -10,7 +10,7 @@ compact Lua table modules that the plugin loads with require().
 This builder never talks to the wiki itself; the mirror owns every request and
 its ledger (see rswiki-mirror/README.md).
 
-Outputs (under plugin/data/):
+Outputs (under plugins/examine-data/data/):
     meta.lua                build date, licence, counts, chunk start indexes
     items.lua               item names + game Obj id -> item index
     sources.lua             drop sources (NPCs, scenery, openable items, ...)
@@ -39,7 +39,7 @@ from rswiki_mirror import Mirror, WikiError  # noqa: E402
 CHUNK_TARGET_BYTES = 150_000   # drop chunks are cut near this size
 
 ROOT = Path(__file__).resolve().parent
-OUT_DIR = ROOT / "plugin" / "data"
+OUT_DIR = ROOT / "plugins" / "examine-data" / "data"
 BUILD_DIR = ROOT / "build"
 
 LICENCE_HEADER = (

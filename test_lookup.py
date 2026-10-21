@@ -10,7 +10,7 @@ from pathlib import Path
 
 import lupa.lua54 as lupa
 
-PLUGIN = Path(__file__).resolve().parent / "plugin"
+PLUGIN = Path(__file__).resolve().parent / "plugins" / "examine-data"
 
 lua = lupa.LuaRuntime(unpack_returned_tuples=True)
 lua.execute(f'package.path = "{PLUGIN.as_posix()}/?.lua"')

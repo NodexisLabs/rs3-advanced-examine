@@ -3,7 +3,7 @@
 -- ground items, and opens a window showing what the RuneScape Wiki data knows:
 -- drops, where an item comes from, recipes and shops, each linked to the next.
 
-local Lookup = require("lookup")
+local Lookup = require("data")   -- the Examine Data library
 local Views = require("views")
 local Window = require("window")
 
