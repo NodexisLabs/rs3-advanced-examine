@@ -4,6 +4,8 @@
 --
 -- The window can be dragged by its title or empty space, and the size button
 -- cycles Small / Medium / Large. Position and size are saved in PersistentDB.
+-- The header shows a 3D model of what was examined, and item rows show the
+-- item's icon; both are drawn by the game from its own assets by game id.
 --
 -- Components are created once and reused; showing a view only changes text,
 -- colours and visibility, and resizing only moves them (layout()).
@@ -20,7 +22,13 @@ local SIZES = {
 }
 local MAX_ROWS = 24           -- rows created once; sizes show the first N
 local ROW_HEIGHT = 20
-local ROWS_TOP = 102
+local HEADER = 78             -- model + title block height
+local TABS_Y = HEADER
+local HEADINGS_Y = HEADER + 28
+local ROWS_TOP = HEADER + 48
+local MODEL_SIZE = 70
+local ICON_SIZE = 18
+local TEXT_X = 12 + MODEL_SIZE + 8   -- title starts right of the model
 local MAX_TABS = 5
 local DEFAULT_X, DEFAULT_Y = 20, 120
 
@@ -33,7 +41,7 @@ local TITLE_COLOUR = 0xFF981FFF
 local layer                   -- plugin UI layer the window lives on
 local box                     -- the GroupBox; nil until first shown
 local parts = {}              -- named child components
-local rowParts = {}           -- rowParts[i] = { name, qty, rate, per }
+local rowParts = {}           -- rowParts[i] = { icon, name, qty, rate, per }
 local tabButtons = {}
 
 local current = nil           -- the view being shown
@@ -104,7 +112,8 @@ local function columns(width)
     local per = { width - 12 - 66, 66 }
     local rate = { per[1] - 4 - 92, 92 }
     local qty = { rate[1] - 4 - 54, 54 }
-    local name = { 12, qty[1] - 4 - 12 }
+    local nameX = 12 + ICON_SIZE + 6
+    local name = { nameX, qty[1] - 4 - nameX }
     return { name, qty, rate, per }
 end
 
@@ -116,16 +125,19 @@ local function layout()
     box:SetSize(width, height)
     box:SetPos(posX, posY)
 
-    place(parts.title, 12, 8, width - 150, 24)
-    place(parts.subtitle, 12, 32, width - 24, 18)
-    place(parts.size, width - 124, 8, 36, 24)
-    place(parts.back, width - 84, 8, 36, 24)
+    place(parts.model, 12, 4, MODEL_SIZE, MODEL_SIZE)
+    place(parts.bigIcon, 12 + (MODEL_SIZE - 54) / 2, 4 + (MODEL_SIZE - 48) / 2, 54, 48)
+    place(parts.title, TEXT_X, 8, width - TEXT_X - 136, 24)
+    place(parts.subtitle, TEXT_X, 32, width - TEXT_X - 12, 18)
+    place(parts.size, width - 140, 8, 36, 24)
+    place(parts.back, width - 100, 8, 52, 24)
     place(parts.close, width - 44, 8, 32, 24)
 
     local cols = columns(width)
-    for i, h in ipairs(parts.headings) do place(h, cols[i][1], 82, cols[i][2], 18) end
+    for i, h in ipairs(parts.headings) do place(h, cols[i][1], HEADINGS_Y, cols[i][2], 18) end
     for i, part in ipairs(rowParts) do
         local y = ROWS_TOP + (i - 1) * ROW_HEIGHT
+        place(part.icon, 12, y + 1, ICON_SIZE, ICON_SIZE)
         for c, key in ipairs({ "name", "qty", "rate", "per" }) do
             place(part[key], cols[c][1], y, cols[c][2], ROW_HEIGHT)
         end
@@ -136,6 +148,70 @@ local function layout()
     place(parts.next, width - 72, pagerY, 60, 24)
     place(parts.footer, 12, height - 28, width - 24, 18)
     parts.size.label = SIZES[sizeIndex].label
+end
+
+---------------------------------------------------------------------------
+-- Game-drawn visuals. Failures are logged once and the visual hidden, so a
+-- model or icon problem never stops the window from showing the data.
+---------------------------------------------------------------------------
+local visualErrors = {}
+local showModel, showIcon
+
+local function visualFailed(what, err)
+    if not visualErrors[what] then
+        visualErrors[what] = true
+        log("[AdvEx] " .. what .. " failed: " .. tostring(err))
+    end
+end
+
+-- Header visual. NPCs get a 3D model; items get their inventory icon drawn
+-- large, because item models are ground models lying flat. Tuned live:
+-- a model's on-screen size depends only on viewDistance (not on the
+-- component size), and NPC_MODEL is anchored at the feet, so it is pushed
+-- down by 40% of the box. 850 per tile of the NPC's grid size fits a cow
+-- (grid 2) at 1700.
+local MODEL_DISTANCE_PER_TILE = 850
+
+showModel = function(model)
+    parts.model.hidden = true
+    parts.bigIcon.hidden = true
+    if model == nil then return end
+    local ok, err = pcall(function()
+        if model.type == "npc" then
+            local gridSize = 1
+            local cfg = config.NPC.FromID(model.id)
+            if cfg and cfg.gridSize and cfg.gridSize > 0 then gridSize = cfg.gridSize end
+            parts.model:SetModel(ui.ModelType.NPC_MODEL, model.id)
+            parts.model.modelWidth = MODEL_SIZE
+            parts.model.modelHeight = MODEL_SIZE
+            parts.model.viewDistance = MODEL_DISTANCE_PER_TILE * gridSize
+            parts.model.screenOffset = Vector3.new(0, MODEL_SIZE * 0.4, 0)
+            parts.model.hidden = false
+        else
+            parts.bigIcon:SetAssociatedObject(model.id)
+            parts.bigIcon.hidden = false
+        end
+    end)
+    if not ok then visualFailed("model", err) end
+end
+
+-- Item icon for a row, drawn from the game's own icon for that obj id.
+-- The quantity (which picks stack variants such as coin piles) is set as a
+-- property: passing it to SetAssociatedObject fails on the number type.
+showIcon = function(sprite, row)
+    sprite.hidden = true
+    if row == nil or row.icon == nil then return end
+    local ok, err = pcall(function()
+        sprite:SetAssociatedObject(row.icon)
+        sprite.hidden = false
+    end)
+    if not ok then
+        visualFailed("icon", err)
+        return
+    end
+    if row.iconQty and row.iconQty > 1 then
+        pcall(function() sprite.associatedObjectQuantity = math.floor(row.iconQty) end)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -159,6 +235,7 @@ render = function()
     parts.title.content = current.title
     parts.subtitle.content = current.subtitle
     parts.back.hidden = #history == 0
+    showModel(current.model)
 
     -- Tabs: share the width between however many this view has.
     local count = math.min(#current.tabs, MAX_TABS)
@@ -167,7 +244,7 @@ render = function()
         local tab = current.tabs[i]
         b.hidden = (tab == nil) or i > count
         if tab then
-            place(b, 12 + (i - 1) * (tabWidth + 4), 54, tabWidth, 24)
+            place(b, 12 + (i - 1) * (tabWidth + 4), TABS_Y, tabWidth, 24)
             b.label = string.format("%s (%d)", tab.name, #tab.rows)
         end
     end
@@ -183,6 +260,7 @@ render = function()
     for i, part in ipairs(rowParts) do
         local row = (i <= rowsShown()) and rows[first + i] or nil
         part.row = row
+        showIcon(part.icon, row)
         for _, key in ipairs({ "name", "qty", "rate", "per" }) do
             part[key].hidden = row == nil
             if row then
@@ -246,6 +324,15 @@ local function build()
     box:Subscribe(ui.Hook.ONCLICK, function() return true end)
     makeDragHandle(box)
 
+    parts.model = ui.Model.new(box)
+    parts.model.clickthrough = false
+    parts.model.hidden = true
+    makeDragHandle(parts.model)
+    parts.bigIcon = ui.Sprite.new(box)
+    parts.bigIcon.clickthrough = false
+    parts.bigIcon.hidden = true
+    makeDragHandle(parts.bigIcon)
+
     parts.title = text(FONT_TITLE)
     parts.title.rgba = TITLE_COLOUR
     parts.subtitle = text(FONT_SMALL)
@@ -259,7 +346,8 @@ local function build()
         render()
         saveSettings()
     end)
-    parts.back = button("<", function()
+    -- Not "<": the client's text renderer reads "<" as the start of a tag.
+    parts.back = button("Back", function()
         current = table.remove(history)
         currentTab, currentPage = 1, 1
         render()
@@ -281,7 +369,11 @@ local function build()
     end
 
     for i = 1, MAX_ROWS do
+        local icon = ui.Sprite.new(box)
+        icon.clickthrough = false
+        icon.hidden = true
         local part = {
+            icon = icon,
             name = text(FONT_BODY),
             qty = text(FONT_BODY),
             rate = text(FONT_BODY, ui.AlignMode.BOTTOMRIGHT),

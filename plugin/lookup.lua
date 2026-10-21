@@ -95,6 +95,25 @@ function Lookup.sourceByNpc(npcId) return sources.byNpc[npcId] end
 function Lookup.sourceByLoc(locId) return sources.byLoc[locId] end
 function Lookup.sourceByObj(objId) return sources.byObj[objId] end
 
+-- Data index -> one game id (the lowest), for drawing icons and models.
+-- Built on first use from the id -> index maps.
+local reverse = {}
+
+local function lowestIdFor(kind, map, index)
+    if reverse[kind] == nil then
+        local r = {}
+        for gameId, idx in pairs(map) do
+            if r[idx] == nil or gameId < r[idx] then r[idx] = gameId end
+        end
+        reverse[kind] = r
+    end
+    return reverse[kind][index]
+end
+
+function Lookup.objIdOfItem(item) return item and lowestIdFor("item", items.byObj, item) end
+function Lookup.npcIdOfSource(source) return source and lowestIdFor("npc", sources.byNpc, source) end
+function Lookup.objIdOfSource(source) return source and lowestIdFor("srcObj", sources.byObj, source) end
+
 -- Where an item drops from: list of drops, `other` = source index.
 function Lookup.dropsOfItem(item) return unpackRows(rowsFor("by_item", item)) end
 

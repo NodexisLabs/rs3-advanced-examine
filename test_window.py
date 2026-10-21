@@ -23,6 +23,8 @@ local function newComponent(kind, parent)
     function c:SetSize(...) self.size = { ... } end
     function c:SetHeaderLayout(...) end
     function c:Subscribe(hook, fn) self.hooks[hook] = fn end
+    function c:SetAssociatedObject(id, qty) self.object = id; self.objectQty = qty end
+    function c:SetModel(kind, id) self.modelKind = kind; self.modelId = id end
     all[#all + 1] = c
     return c
 end
@@ -32,13 +34,16 @@ ui = {
     Interfaces = { GetComponent = function()
         local l = newComponent("layer"); l.width, l.height = 1278, 1360; return l end },
 }
-for _, kind in ipairs({ "GroupBox", "Text", "Button" }) do
+ui.ModelType = { NPC_MODEL = 6, OBJECT = 4 }
+for _, kind in ipairs({ "GroupBox", "Text", "Button", "Sprite", "Model" }) do
     ui[kind] = { new = function(parent) return newComponent(kind, parent) end }
 end
 id = { Font = setmetatable({}, { __index = function(_, k) return k end }),
        StyleSheet = setmetatable({}, { __index = function(_, k) return k end }),
        Component = { TOPLEVEL_V2__PLUGIN_BUILD_LAYER_TOP = 1 } }
 MiniMenuActionVerbType = { EXAMINE = 1 }
+Vector3 = { new = function(x, y, z) return { x = x, y = y, z = z } end }
+config = { NPC = { FromID = function(id) return { gridSize = (id == 11240) and 1 or 2 } end } }
 local store = {}
 PersistentDB = {
     GetInt = function(_, k) return store[k] end,
@@ -80,6 +85,19 @@ function clickRow(name)
     error("no clickable row " .. name)
 end
 function theBox() for _, c in ipairs(all) do if c.kind == "GroupBox" then return c end end end
+function theModel() for _, c in ipairs(all) do if c.kind == "Model" then return c end end end
+-- the header's big icon: the first Sprite created (right after the Model)
+function bigIcon() for i, c in ipairs(all) do if c.kind == "Model" then return all[i + 1] end end end
+-- obj id drawn by the icon on the same row as the visible text `name`
+function iconFor(name)
+    for i, c in ipairs(all) do
+        if c.kind == "Text" and not c.hidden and c.content == name then
+            local s = all[i - 1]
+            if s and s.kind == "Sprite" and not s.hidden then return s.object end
+            return nil
+        end
+    end
+end
 function boxHidden() for _, c in ipairs(all) do if c.kind == "GroupBox" then return c.hidden end end end
 function componentCount() return #all end
 """
@@ -112,7 +130,12 @@ check("subtitle counts drops", "42 drops" in shown)
 check("first drop row is Bones", "Bones" in shown)
 check("tab label has count", g.findButton("Drops (42)") is not None)
 check("page 1 of 3", "Page 1 / 3" in shown)
-check("Back hidden on a fresh examine", g.findButton("<") is None)
+check("Back hidden on a fresh examine", g.findButton("Back") is None)
+model = g.theModel()
+check("header shows the clicked NPC's model", model.modelKind == 6 and model.modelId == 11240 and not model.hidden,
+      f"{model.modelKind} {model.modelId}")
+check("model camera scaled by grid size (goblin: 1 tile -> 850)", model.viewDistance == 850, str(model.viewDistance))
+check("Bones row has the Bones icon (obj 526)", g.iconFor("Bones") == 526, str(g.iconFor("Bones")))
 count_after_build = g.componentCount()
 
 # 2. Paging.
@@ -125,12 +148,16 @@ check("Prev back to page 1", "Page 1 / 3" in texts())
 g.clickRow("Bones")
 shown = texts()
 check("clicking Bones opens the item", shown[0] == "Bones", shown[0])
+big = g.bigIcon()
+check("item view shows the big item icon, not the model", big.object == 526 and not big.hidden and model.hidden,
+      f"{big.object} model hidden={model.hidden}")
+check("monster rows have no icon", g.iconFor("Goblin (Lumbridge)") is None)
 check("item has a Sources tab", g.findButton("Sources (") is not None)
-check("Back visible after navigating", g.findButton("<") is not None)
+check("Back visible after navigating", g.findButton("Back") is not None)
 g.press("Used in")
 check("Used in tab shows a recipe heading", any(s.startswith("Recipe 1:") for s in texts()),
       next((s for s in texts() if s.startswith("Recipe")), "none"))
-g.press("<")
+g.press("Back")
 check("Back returns to the goblin", texts()[0] == "Goblin (Lumbridge)")
 
 # 4. A ground item that the wiki also lists as a drop source, and an unknown id.

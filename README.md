@@ -10,6 +10,8 @@ beta world; not yet submitted to the Plugin Hub.**
 
 ![Advanced Examine on a cow](docs/window.png)
 
+![An item: its icon, sources and uses](docs/item.png)
+
 ![The Advanced Examine menu option](docs/menu.png)
 
 ## What it does
@@ -19,7 +21,9 @@ beta world; not yet submitted to the Plugin Hub.**
   ("Rare", "Varies") are grey and never turned into a guessed number.
 - **Items:** Sources, Made by, Used in and Shops tabs. Items you can open (caskets, crackers) get a
   Contains tab.
-- **Linked:** click any row to open that item or monster, and `<` to go back.
+- **Linked:** click any row to open that item or monster, and Back to return.
+- **Visuals:** a 3D model of the monster you examined, the item's icon for items, and an icon on
+  every item row, all drawn by the game from its own assets.
 - **Window:** drag it anywhere, switch between S/M/L sizes, and it remembers both.
 - Works on NPCs, scenery and ground items. Backpack and bank items are next.
 

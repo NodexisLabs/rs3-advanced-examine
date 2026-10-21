@@ -33,7 +33,12 @@ end
 local function viewFor(kind, id, gameName)
     if kind == "npc" then
         local source = Lookup.sourceByNpc(id)
-        if source then return Views.source(source) end
+        if source then
+            -- Draw the exact NPC variant that was clicked, not the wiki's first id.
+            local view = Views.source(source)
+            view.model = { type = "npc", id = id }
+            return view
+        end
     elseif kind == "loc" then
         local source = Lookup.sourceByLoc(id)
         if source then return Views.source(source) end

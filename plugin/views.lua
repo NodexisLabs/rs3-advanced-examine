@@ -1,11 +1,15 @@
 -- Builds what the Advanced Examine window shows, without touching any UI.
 --
 -- A view is:
---   { title, subtitle, tabs = { { name, columns, rows = { row, ... } }, ... } }
+--   { title, subtitle, model = { type = "npc"|"obj", id } | nil,
+--     tabs = { { name, columns, rows = { row, ... } }, ... } }
 -- where columns are the four headings; omitted means DROP_COLUMNS.
 -- and a row is:
 --   { name, qty, rate, per, colour, link = { kind = "item"|"source", index } | nil,
+--     icon = game obj id to draw | nil, iconQty,
 --     header = true when the row is a section heading }
+-- Icons and models are drawn by the game from its own assets; the view only
+-- supplies game ids.
 -- Keeping this separate from the window lets it be tested outside the game.
 
 local Lookup = require("lookup")
@@ -55,6 +59,9 @@ local function dropRows(drops, linkKind, nameOf)
     local rows = {}
     for _, drop in ipairs(drops) do
         rows[#rows + 1] = {
+            -- Item rows get the item's icon; source rows (monsters) have none.
+            icon = linkKind == "item" and Lookup.objIdOfItem(drop.other) or nil,
+            iconQty = drop.qtyLow,
             name = nameOf(drop.other) or "?",
             qty = quantityText(drop),
             rate = drop.rarity,
@@ -82,7 +89,8 @@ local function recipeRows(recipes, listKey)
             name = string.format("Recipe %d: %s", n, #skills > 0 and table.concat(skills, ", ") or "no skill"),
             qty = "", rate = recipe.members and "members" or "", per = "" }
         for _, entry in ipairs(recipe[listKey] or {}) do
-            rows[#rows + 1] = { name = "  " .. (Lookup.itemName(entry[1]) or "?"),
+            rows[#rows + 1] = { name = Lookup.itemName(entry[1]) or "?",
+                icon = Lookup.objIdOfItem(entry[1]), iconQty = entry[2],
                 qty = entry[2] and tostring(entry[2]) or "?", rate = "", per = "",
                 colour = WHITE, link = itemLink(entry[1]) }
         end
@@ -106,8 +114,10 @@ end
 ---------------------------------------------------------------------------
 function Views.source(source)
     local drops = Lookup.dropsFromSource(source)
+    local npcId, objId = Lookup.npcIdOfSource(source), Lookup.objIdOfSource(source)
     return {
         title = Lookup.sourceName(source) or "?",
+        model = (npcId and { type = "npc", id = npcId }) or (objId and { type = "obj", id = objId }) or nil,
         subtitle = string.format("%d drops", #drops),
         tabs = { { name = "Drops", rows = dropRows(drops, "item", Lookup.itemName) } },
     }
@@ -117,8 +127,10 @@ function Views.item(item)
     local sources = Lookup.dropsOfItem(item)
     local making, using = Lookup.recipesMaking(item), Lookup.recipesUsing(item)
     local shops = shopRows(item)
+    local objId = Lookup.objIdOfItem(item)
     return {
         title = Lookup.itemName(item) or "?",
+        model = objId and { type = "obj", id = objId } or nil,
         subtitle = string.format("%d sources, %d recipes, used in %d, %d shops",
             #sources, #making, #using, #shops),
         tabs = {
