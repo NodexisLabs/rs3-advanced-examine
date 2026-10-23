@@ -2,7 +2,7 @@
 -- tabs, a page of rows and paging buttons. Rows that link to another item or
 -- source open it when clicked; Back returns to the previous view.
 --
--- The window can be dragged by its title or empty space, and the size button
+-- The window can be dragged by its header (see Dragging), and the size button
 -- cycles Small / Medium / Large. Position and size are saved in PersistentDB.
 -- The header shows a 3D model of what was examined, and item rows show the
 -- item's icon; both are drawn by the game from its own assets by game id.
@@ -281,30 +281,87 @@ render = function()
 end
 
 ---------------------------------------------------------------------------
--- Dragging: the client reports where a drag started and ended; the window
--- moves by that offset, kept on screen, and the position is saved.
+-- Dragging. The live client never sends ONDRAG/ONDRAGCOMPLETE to plugin
+-- components (2026-10-22), so the window polls instead: an invisible grip
+-- over the header (left of the buttons) is watched every logic tick. A fresh
+-- press starts a drag, the window follows the mouse while the press lasts,
+-- and the position is saved on release.
+--
+-- The client drops a press as soon as the cursor leaves the pressed
+-- component, so while dragging the grip is stretched over the whole layer
+-- (a press survives its component growing). It sits on the layer, not in the
+-- box, for that reason. A component hidden while pressed can read pressed
+-- for good, so the grip is made fresh each time the window opens.
 ---------------------------------------------------------------------------
-local dragStart = nil
+local GRIP_RIGHT_GAP = 144     -- keep the size, Back and X buttons clickable
+local grip = nil
+local gripWasDown = false
+local drag = nil               -- { mx, my, boxX, boxY } while dragging
 
-local function onDrag(_, startX, startY)
-    dragStart = { x = startX, y = startY, boxX = posX, boxY = posY }
+local function read(c, prop)
+    local ok, v = pcall(function() return c[prop] end)
+    if ok then return v end
+    return nil
 end
 
-local function onDragComplete(_, _, endX, endY)
-    if dragStart == nil then return end
-    local width = SIZES[sizeIndex].width
-    local maxX = math.max(0, (layer.width or 1280) - width)
+local function mousePos()
+    if not Mouse.IsAvailable() then return nil end
+    return Mouse.GetX(), Mouse.GetY()
+end
+
+local function placeGrip()
+    if grip == nil then return end
+    if drag then
+        place(grip, 0, 0, layer.width or 1280, layer.height or 1360)
+    else
+        place(grip, posX, posY, SIZES[sizeIndex].width - GRIP_RIGHT_GAP, HEADER)
+    end
+end
+
+local function newGrip()
+    if grip then pcall(function() grip:Destroy() end) end
+    grip = ui.Canvas.new(layer)
+    grip.clickthrough = false
+    grip:Subscribe(ui.Hook.ONCLICK, function() return true end)
+    gripWasDown, drag = false, nil
+    placeGrip()
+end
+
+local function clampToLayer(x, y)
+    local maxX = math.max(0, (layer.width or 1280) - SIZES[sizeIndex].width)
     local maxY = math.max(0, (layer.height or 1360) - 60)
-    posX = math.min(maxX, math.max(0, dragStart.boxX + (endX - dragStart.x)))
-    posY = math.min(maxY, math.max(0, dragStart.boxY + (endY - dragStart.y)))
-    dragStart = nil
-    box:SetPos(posX, posY)
+    return math.min(maxX, math.max(0, x)), math.min(maxY, math.max(0, y))
+end
+
+local function endDrag()
+    drag = nil
+    placeGrip()
     saveSettings()
 end
 
-local function makeDragHandle(c)
-    c:Subscribe(ui.Hook.ONDRAG, onDrag)
-    c:Subscribe(ui.Hook.ONDRAGCOMPLETE, onDragComplete)
+local function updateDrag()
+    if grip == nil or box == nil or box.hidden then return end
+    local down = read(grip, "isClicked") == true and read(grip, "visibleGlobal") ~= false
+    local began = down and not gripWasDown and read(grip, "isMouseOver") ~= false
+    gripWasDown = down
+    if began and drag == nil then
+        local mx, my = mousePos()
+        if mx == nil then return end
+        drag = { mx = mx, my = my, boxX = posX, boxY = posY }
+        placeGrip()
+    elseif drag and not down then
+        endDrag()
+        return
+    end
+    if drag then
+        local mx, my = mousePos()
+        if mx == nil then return end
+        local x, y = clampToLayer(drag.boxX + mx - drag.mx, drag.boxY + my - drag.my)
+        if x ~= posX or y ~= posY then
+            posX, posY = x, y
+            box:SetPos(posX, posY)
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -322,27 +379,23 @@ local function build()
     -- so they never fall through and walk the player.
     box.clickthrough = false
     box:Subscribe(ui.Hook.ONCLICK, function() return true end)
-    makeDragHandle(box)
 
     parts.model = ui.Model.new(box)
     parts.model.clickthrough = false
     parts.model.hidden = true
-    makeDragHandle(parts.model)
     parts.bigIcon = ui.Sprite.new(box)
     parts.bigIcon.clickthrough = false
     parts.bigIcon.hidden = true
-    makeDragHandle(parts.bigIcon)
 
     parts.title = text(FONT_TITLE)
     parts.title.rgba = TITLE_COLOUR
     parts.subtitle = text(FONT_SMALL)
     parts.subtitle.rgba = GREY
-    makeDragHandle(parts.title)
-    makeDragHandle(parts.subtitle)
 
     parts.size = button("M", function()
         sizeIndex = sizeIndex % #SIZES + 1
         layout()
+        placeGrip()
         render()
         saveSettings()
     end)
@@ -403,6 +456,13 @@ local function build()
     parts.footer.rgba = GREY
 
     layout()
+    Event.Logic.Subscribe("advancedExamineDrag", function()
+        local ok, err = pcall(updateDrag)
+        if not ok then
+            drag = nil
+            visualFailed("window drag", err)
+        end
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -418,11 +478,14 @@ function Window.show(view)
     current = view
     currentTab, currentPage = 1, 1
     box.hidden = false
+    newGrip()
     render()
 end
 
 function Window.close()
     if box then box.hidden = true end
+    if grip then grip.hidden = true end
+    drag = nil
 end
 
 return Window

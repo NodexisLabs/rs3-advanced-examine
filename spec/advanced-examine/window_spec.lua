@@ -125,14 +125,59 @@ test("the size button cycles M -> L -> S and is saved", function()
     expect(kit.db.get("windowSize")).toBe(1)
 end)
 
-test("dragging moves the window, saves the position, and stays on screen", function()
+-- Drags with a real mouse: the live client sends no drag events, so the
+-- window polls its header grip and the Mouse every logic tick.
+local function dragBy(dx, dy)
     local box = theBox()
-    kit.ui.drag(box, 100, 200, 160, 230)
+    local x, y = box.x + 150, box.y + 20        -- on the title, left of the buttons
+    kit.pointer.press(x, y)
+    kit.tick()
+    kit.pointer.move(x + dx, y + dy)
+    kit.tick()
+    return kit.pointer.release()
+end
+
+test("dragging the header moves the window, saves the position, and stays on screen", function()
+    local box = theBox()
+    expect({ box.x, box.y }).toEqual({ 20, 120 })
+    local r = dragBy(60, 30)
+    expect(r.released).toBe(true)
+    kit.tick()
     expect({ box.x, box.y }).toEqual({ 80, 150 })
     expect(kit.db.get("windowX")).toBe(80)
     expect(kit.db.get("windowY")).toBe(150)
-    kit.ui.drag(box, 0, 0, -5000, -5000)
+    dragBy(-225, -165)                          -- cursor to (5, 5): past the corner, clamped
+    kit.tick()
     expect({ box.x, box.y }).toEqual({ 0, 0 })
+end)
+
+test("a fast move far off the header keeps the drag", function()
+    local box = theBox()
+    local r = dragBy(500, 400)                  -- one tick, well outside the old header
+    expect(r.released).toBe(true)
+    kit.tick()
+    expect({ box.x, box.y }).toEqual({ 500, 400 })
+end)
+
+test("clicking a header button does not move the window", function()
+    local box = theBox()
+    local before = { box.x, box.y }
+    local size = kit.ui.button("S")
+    kit.pointer.press(box.x + size.x + 10, box.y + size.y + 10)
+    kit.tick()
+    kit.pointer.move(box.x + size.x + 40, box.y + size.y + 30)
+    kit.tick()
+    kit.pointer.release()
+    kit.tick()
+    expect({ box.x, box.y }).toEqual(before)
+end)
+
+test("another Lumbridge goblin variant (NPC 12353, seen live) opens the same page", function()
+    kit.config.npc(12353, { name = "Goblin", gridSize = 1 })
+    local variant = kit.world.addNpc({ id = 12353, coord = { x = 3248, z = 3270 } })
+    examine({ npc = variant, subject = "<col=ffff00>Goblin<col=00ff00> (level: 2)" })
+    expect(kit.ui.texts()).toContain("Goblin (Lumbridge)")
+    expect(theModel().modelID1).toBe(12353)
 end)
 
 test("components are reused, not rebuilt, and X hides the window", function()
